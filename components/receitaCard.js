@@ -1,14 +1,20 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 
-export default function ReceitaCard({ nome, tempoPreparo }) {
+export default function ReceitaCard({ nome, tempoPreparo, fotoUri }) {
     return (
         <View style={styles.card}>
-        <Text style={styles.nome}>{nome}</Text>
-        <Text style={styles.tempo}>{tempoPreparo}</Text>
+            {fotoUri && (
+                <Image
+                    source={{ uri: fotoUri }}
+                    style={styles.foto}
+                />
+            )}
+            <Text style={styles.nome}>{nome}</Text>
+            <Text style={styles.tempo}>{tempoPreparo} min</Text>
         </View>
     );
-    }
+}
 
     const styles = StyleSheet.create({
     card: {
@@ -31,6 +37,11 @@ export default function ReceitaCard({ nome, tempoPreparo }) {
         color: '#666',
         marginTop: 4,
         color: '#000'
-
     },
+    foto: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 10,
+},
 });

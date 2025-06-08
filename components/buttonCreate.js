@@ -9,7 +9,7 @@ export default function ButtonCreate() {
     return (
         <TouchableOpacity 
             style={styles.button} 
-            onPress={() => navigation.navigate('NewReceita')}>
+            onPress={() => navigation.navigate('NovaReceita')}>
             <Ionicons name="add" size={24} color="white" style={styles.icon} />
             <Text style={styles.text}>Criar uma nova receita</Text>
         </TouchableOpacity>

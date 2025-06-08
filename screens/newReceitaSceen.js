@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image } from 'react-native';
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    FlatList,
+    StyleSheet,
+    Image,
+    ActivityIndicator,
+    Alert
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
-
-export default function NewReceita() {
+export default function NovaReceita() {
     const [nomeReceita, setNomeReceita] = useState('');
-    const [tempoPreparo, settempoPreparo] = useState('');
+    const [tempoPreparo, setTempoPreparo] = useState('');
 
     const [ingredienteInput, setIngredienteInput] = useState('');
     const [ingredientes, setIngredientes] = useState([]);
@@ -16,6 +24,8 @@ export default function NewReceita() {
     const [modoPreparo, setModoPreparo] = useState([]);
 
     const [fotoUri, setFotoUri] = useState(null);
+
+    const [loading, setLoading] = useState(false);
 
     // Adicionar ingrediente
     const handleAddIngrediente = () => {
@@ -33,17 +43,19 @@ export default function NewReceita() {
         }
     };
 
-const handleTirarFoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-        alert('Permissão para acessar a câmera foi negada.');
+    const handleTirarFoto = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+        Alert.alert('Permissão negada', 'Permissão para acessar a câmera foi negada.');
         return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
         quality: 0.5,
         base64: false,
-    });
-    if (!result.canceled) {
+        });
+
+        if (!result.canceled) {
         const uri = result.assets[0].uri;
         setFotoUri(uri);
 
@@ -53,56 +65,76 @@ const handleTirarFoto = async () => {
         } catch (error) {
             console.error('Erro ao salvar a URI da foto:', error);
         }
-    }
-};
+        }
+    };
 
-useEffect(() => {
-    const carregarFotoSalva = async () => {
+    useEffect(() => {
+        const carregarFotoSalva = async () => {
         try {
             const uriSalva = await AsyncStorage.getItem('fotoUri');
             if (uriSalva !== null) {
-                setFotoUri(uriSalva);
+            setFotoUri(uriSalva);
             }
         } catch (error) {
             console.error('Erro ao carregar a foto URI:', error);
         }
-    };
-    carregarFotoSalva();
-}, []);
+        };
+        carregarFotoSalva();
+    }, []);
 
     const handleSalvarReceita = async () => {
-    const receita = {
-        nome: nomeReceita,
-        tempoPreparo: tempoPreparo,
-        ingredientes: ingredientes,
-        modoPreparo: modoPreparo,
-    };
+        if (!nomeReceita || !tempoPreparo) {
+        Alert.alert('Campos obrigatórios', 'Preencha o nome e o tempo de preparo.');
+        return;
+        }
 
-    try {
+        const receita = {
+            nome: nomeReceita,
+            ingredientes: ingredientes,
+            modoPreparo: modoPreparo,
+            tempoPreparo: parseInt(tempoPreparo),
+            fotoUri: fotoUri,
+        };
+
+        let receitasSalvas = await AsyncStorage.getItem('receitas');
+        receitasSalvas = receitasSalvas ? JSON.parse(receitasSalvas) : [];
+        const novaListaDeReceitas = [...receitasSalvas, receita];
+        await AsyncStorage.setItem('receitas', JSON.stringify(novaListaDeReceitas));
+
+
+        setLoading(true);
+        try {
         const response = await fetch('https://receitinhas-api.onrender.com/receitas', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(receita),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(receita),
         });
 
         if (response.ok) {
-        alert('Receita salva com sucesso!');
-        // Aqui você pode navegar de volta ou limpar os campos
+            Alert.alert('Sucesso', 'Receita salva com sucesso!');
+            // Limpar todos os campos
+            setNomeReceita('');
+            setTempoPreparo('');
+            setIngredientes([]);
+            setModoPreparo([]);
+            setIngredienteInput('');
+            setModoInput('');
+            // Opcional: remover foto salva
+            await AsyncStorage.removeItem('fotoUri');
+            setFotoUri(null);
         } else {
-        alert('Erro ao salvar a receita.');
+            Alert.alert('Erro', 'Erro ao salvar a receita.');
         }
-    } catch (error) {
+        } catch (error) {
         console.error(error);
-        alert('Erro de conexão com o servidor.');
-    }
-};
-
+        Alert.alert('Erro', 'Erro de conexão com o servidor.');
+        } finally {
+        setLoading(false);
+        }
+    };
 
     return (
         <View style={{ padding: 20 }}>
-
         <TouchableOpacity style={styles.fotoButton} onPress={handleTirarFoto}>
             <Text style={styles.fotoButtonText}>Tirar Foto</Text>
         </TouchableOpacity>
@@ -124,8 +156,8 @@ useEffect(() => {
             <Text>Tempo de Preparo:</Text>
             <TextInput
             value={tempoPreparo}
-            onChangeText={settempoPreparo}
-            placeholder="Ex: 30 minutos"
+            onChangeText={setTempoPreparo}
+            keyboardType="numeric"
             style={styles.input}
             />
         </View>
@@ -151,7 +183,7 @@ useEffect(() => {
             />
         </View>
 
-        {/* Modo de Preparo */}
+      {/* Modo de Preparo */}
         <View style={styles.section}>
             <Text style={styles.sectionTitle}>Modo de Preparo:</Text>
             <View style={styles.row}>
@@ -172,8 +204,12 @@ useEffect(() => {
             />
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSalvarReceita}>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSalvarReceita} disabled={loading}>
+            {loading ? (
+            <ActivityIndicator color="white" />
+            ) : (
             <Text style={styles.saveButtonText}>Salvar Receita</Text>
+            )}
         </TouchableOpacity>
         </View>
     );
@@ -214,31 +250,32 @@ useEffect(() => {
         paddingVertical: 4,
     },
     saveButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 20,
+        backgroundColor: '#4CAF50',
+        padding: 12,
+        borderRadius: 5,
+        alignItems: 'center',
+        marginTop: 20,
     },
     saveButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-},fotoButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-},
-fotoButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-},
-fotoPreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
-    marginBottom: 20,
-},
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    fotoButton: {
+        backgroundColor: '#007AFF',
+        padding: 10,
+        borderRadius: 5,
+        marginBottom: 10,
+    },
+    fotoButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    fotoPreview: {
+        width: '100%',
+        height: 200,
+        borderRadius: 10,
+        marginBottom: 20,
+    },
     });
